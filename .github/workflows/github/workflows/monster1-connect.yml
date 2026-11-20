@@ -1,0 +1,179 @@
+
+name: Monster-1 - Convert and Validate
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  convert:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Download previous Monster Chat artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: Monster-Chat-Complete
+          repository: ayhan139106206/reporjm-ai
+          run-id: 44747686229
+          github-token: ${{ github.token }}
+          path: downloaded
+
+      - name: Extract project
+        run: |
+          mkdir -p source
+          ZIP=$(find downloaded -name "*.zip" -type f | head -n 1)
+
+          if [ -z "$ZIP" ]; then
+            echo "Monster Chat ZIP not found"
+            exit 1
+          fi
+
+          unzip -q "$ZIP" -d source
+          MODEL=$(find source -name "monster1.pt" -type f | head -n 1)
+          CODE=$(find source -name "model.py" -type f | head -n 1)
+
+          test -n "$MODEL" || exit 1
+          test -n "$CODE" || exit 1
+
+          echo "MODEL_DIR=$(dirname "$CODE")" >> $GITHUB_ENV
+          echo "MODEL_FILE=$MODEL" >> $GITHUB_ENV
+
+      - name: Install conversion tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch onnx onnxscript onnxruntime
+
+      - name: Convert Monster-1
+        run: |
+          cd "$MODEL_DIR"
+
+          mkdir -p output
+
+          cp "$GITHUB_WORKSPACE/$MODEL_FILE" output/monster1.pt
+
+          python - <<'PY'
+          import torch
+          import os
+          import sys
+
+          sys.path.insert(0, os.getcwd())
+          from model import Monster1
+
+          model = Monster1()
+          model.load_state_dict(
+              torch.load(
+                  "output/monster1.pt",
+                  map_location="cpu",
+                  weights_only=True
+              )
+          )
+          model.eval()
+
+          sample = torch.ones((1, 16), dtype=torch.long)
+
+          torch.onnx.export(
+              model,
+              sample,
+              "output/monster1.onnx",
+              input_names=["input_ids"],
+              output_names=["logits"],
+              dynamic_axes={
+                  "input_ids": {0: "batch", 1: "sequence"},
+                  "logits": {0: "batch", 1: "sequence"}
+              },
+              opset_version=17,
+              dynamo=False
+          )
+
+          print("Monster-1 ONNX export completed")
+          PY
+
+      - name: Verify ONNX model
+        run: |
+          cd "$MODEL_DIR"
+
+          python - <<'PY'
+          import torch
+          import onnx
+          import onnxruntime as ort
+          import numpy as np
+          from model import Monster1
+
+          path = "output/monster1.onnx"
+
+          onnx_model = onnx.load(path)
+          onnx.checker.check_model(onnx_model)
+
+          session = ort.InferenceSession(
+              path,
+              providers=["CPUExecutionProvider"]
+          )
+
+          tokens = np.ones((1, 16), dtype=np.int64)
+          result = session.run(None, {"input_ids": tokens})[0]
+
+          model = Monster1()
+          model.load_state_dict(
+              torch.load(
+                  "output/monster1.pt",
+                  map_location="cpu",
+                  weights_only=True
+              )
+          )
+          model.eval()
+
+          with torch.no_grad():
+              expected = model(torch.from_numpy(tokens)).numpy()
+
+          np.testing.assert_allclose(
+              result,
+              expected,
+              rtol=1e-3,
+              atol=1e-4
+          )
+
+          print("ONNX verification successful")
+          print("Output shape:", result.shape)
+          PY
+
+      - name: Package Monster-1
+        run: |
+          cd "$MODEL_DIR"
+
+          mkdir -p final
+          cp output/monster1.pt final/
+          cp output/monster1.onnx final/
+
+          TOKENIZER=$(find . -name "tokenizer.model" -type f | head -n 1)
+
+          if [ -n "$TOKENIZER" ]; then
+            cp "$TOKENIZER" final/
+          fi
+
+          cat > final/REPORT.txt <<'EOF'
+          Monster-1 conversion report
+
+          Original PyTorch weights preserved.
+          ONNX export completed.
+          ONNX Runtime verification completed.
+
+          Important:
+          This is an experimental model.
+          It has not been trained on real language data.
+          Worker deployment and inference are separate steps.
+          EOF
+
+          cd final
+          zip -r "$GITHUB_WORKSPACE/monster1-converted.zip" .
+
+      - name: Upload converted model
+        uses: actions/upload-artifact@v4
+        with:
+          name: Monster-1-Converted
+          path: monster1-converted.zip
+          retention-days: 30
