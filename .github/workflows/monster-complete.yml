@@ -1,0 +1,212 @@
+
+name: Monster Chat - Complete AI Builder
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/monster-complete.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Python Setup
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install packages
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch numpy sentencepiece fastapi uvicorn pydantic requests
+
+      - name: Generate Complete Monster AI
+        run: |
+          mkdir -p monster_chat/{data,model,engine,api,output}
+
+          cat > monster_chat/config.json <<'EOF'
+          {
+            "name": "Monster-1",
+            "version": "1.0.0",
+            "architecture": "custom-transformer",
+            "language": "multilingual",
+            "vocab_size": 4096,
+            "hidden_size": 256,
+            "layers": 4,
+            "heads": 4,
+            "pretrained_model": false
+          }
+          EOF
+
+          cat > monster_chat/model.py <<'PY'
+          import torch
+          from torch import nn
+
+          class Monster1(nn.Module):
+              def __init__(self, vocab=4096, dim=256, layers=4, heads=4):
+                  super().__init__()
+                  self.token = nn.Embedding(vocab, dim)
+                  self.position = nn.Embedding(1024, dim)
+                  block = nn.TransformerEncoderLayer(
+                      d_model=dim,
+                      nhead=heads,
+                      dim_feedforward=dim*4,
+                      batch_first=True
+                  )
+                  self.transformer = nn.TransformerEncoder(block, layers)
+                  self.norm = nn.LayerNorm(dim)
+                  self.head = nn.Linear(dim, vocab)
+
+              def forward(self, x):
+                  pos = torch.arange(x.size(1), device=x.device)
+                  h = self.token(x) + self.position(pos)
+                  mask = torch.triu(
+                      torch.ones(x.size(1), x.size(1), device=x.device),
+                      diagonal=1
+                  ).bool()
+                  h = self.transformer(h, mask=mask)
+                  return self.head(self.norm(h))
+          PY
+
+          cat > monster_chat/tokenizer.py <<'PY'
+          import sentencepiece as spm
+          from pathlib import Path
+
+          Path("data").mkdir(exist_ok=True)
+          with open("data/corpus.txt", "w", encoding="utf-8") as f:
+              f.write(
+                  "سلام. من مانستر چت هستم.\n"
+                  "Hello. I am Monster Chat.\n"
+                  "Bonjour. Je suis Monster Chat.\n"
+                  "Hola. Soy Monster Chat.\n"
+                  "مرحبا أنا مونستر شات.\n"
+              )
+          spm.SentencePieceTrainer.train(
+              input="data/corpus.txt",
+              model_prefix="model/tokenizer",
+              vocab_size=128,
+              model_type="bpe",
+              character_coverage=0.9995
+          )
+          PY
+
+          cat > monster_chat/train.py <<'PY'
+          import torch
+          from model import Monster1
+          from pathlib import Path
+
+          torch.manual_seed(42)
+          device = "cuda" if torch.cuda.is_available() else "cpu"
+          model = Monster1().to(device)
+          optimizer = torch.optim.AdamW(model.parameters(), lr=0.0003)
+
+          data = torch.randint(0, 128, (32, 64), device=device)
+
+          model.train()
+          for step in range(100):
+              x, y = data[:, :-1], data[:, 1:]
+              logits = model(x)
+              loss = torch.nn.functional.cross_entropy(
+                  logits.reshape(-1, 4096),
+                  y.reshape(-1)
+              )
+              optimizer.zero_grad()
+              loss.backward()
+              optimizer.step()
+              if step % 10 == 0:
+                  print("Training:", step, "Loss:", loss.item())
+
+          Path("output").mkdir(exist_ok=True)
+          torch.save(model.state_dict(), "output/monster1.pt")
+          print("Training finished")
+          PY
+
+          cat > monster_chat/engine.py <<'PY'
+          import torch
+          from model import Monster1
+
+          class MonsterEngine:
+              def __init__(self, path="output/monster1.pt"):
+                  self.model = Monster1()
+                  self.model.load_state_dict(
+                      torch.load(path, map_location="cpu", weights_only=True)
+                  )
+                  self.model.eval()
+
+              def generate(self, tokens, max_new_tokens=40):
+                  x = torch.tensor([tokens], dtype=torch.long)
+                  for _ in range(max_new_tokens):
+                      with torch.no_grad():
+                          logits = self.model(x[:, -1024:])
+                      next_token = logits[:, -1].argmax(-1).item()
+                      x = torch.cat(
+                          [x, torch.tensor([[next_token]])], dim=1
+                      )
+                  return x[0].tolist()
+          PY
+
+          cat > monster_chat/api.py <<'PY'
+          from fastapi import FastAPI
+          from pydantic import BaseModel
+
+          app = FastAPI(title="Monster Chat API")
+
+          class ChatRequest(BaseModel):
+              message: str
+
+          @app.get("/v1/health")
+          def health():
+              return {"ok": True, "service": "Monster Chat"}
+
+          @app.post("/v1/chat")
+          def chat(req: ChatRequest):
+              return {
+                  "model": "Monster-1",
+                  "message": req.message,
+                  "status": "engine_training_required",
+                  "reply": "Monster-1 needs real multilingual training data."
+              }
+          PY
+
+          cat > monster_chat/README.md <<'EOF'
+          # Monster Chat
+          Custom Transformer research project.
+          No pretrained model is used.
+          Synthetic data is only for pipeline testing.
+          Real multilingual training requires a licensed corpus.
+          EOF
+
+      - name: Train Tokenizer
+        run: |
+          cd monster_chat
+          python tokenizer.py
+
+      - name: Train Model
+        run: |
+          cd monster_chat
+          python train.py
+
+      - name: Verify Model
+        run: |
+          cd monster_chat
+          python -c "import torch; from model import Monster1; m=Monster1(); m.load_state_dict(torch.load('output/monster1.pt', map_location='cpu', weights_only=True)); print('MODEL VERIFIED')"
+
+      - name: Package Complete Project
+        run: |
+          zip -r monster-chat-complete.zip monster_chat/
+
+      - name: Upload Final ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: Monster-Chat-Complete
+          path: monster-chat-complete.zip
+          retention-days: 30
