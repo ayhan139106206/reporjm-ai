@@ -1,0 +1,44 @@
+
+name: Monster-1 Auto Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download converted model
+        uses: actions/download-artifact@v4
+        with:
+          name: Monster-1-Converted
+          repository: ayhan139106206/reporjm-ai
+          run-id: 44747686229
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: model-files
+
+      - name: Check model files
+        run: |
+          echo "Checking Monster-1 files..."
+          find model-files -type f
+          test -n "$(find model-files -name 'monster1.onnx' -print -quit)"
+          test -n "$(find model-files -name 'monster1.pt' -print -quit)"
+          cd model-files
+          zip -r ../Monster-1-Weights.zip .
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: v0.1.2
+          name: Monster-1 Weights
+          body: |
+            Monster-1 model weights and ONNX export.
+            Automatically published by GitHub Actions.
+          files: |
+            Monster-1-Weights.zip
+          fail_on_unmatched_files: true
