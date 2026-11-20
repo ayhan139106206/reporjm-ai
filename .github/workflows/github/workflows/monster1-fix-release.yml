@@ -1,0 +1,37 @@
+
+name: Monster-1 Fix Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download model artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: Monster-1-Converted
+          repository: ayhan139106206/reporjm-ai
+          run-id: 44747686229
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: model-files
+
+      - name: Create ZIP
+        run: |
+          test -f "$(find model-files -name monster1.onnx | head -1)"
+          test -f "$(find model-files -name monster1.pt | head -1)"
+          cd model-files
+          zip -r ../Monster-1-Weights.zip .
+
+      - name: Upload ZIP to Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: v0.1.2
+          files: Monster-1-Weights.zip
+          fail_on_unmatched_files: true
