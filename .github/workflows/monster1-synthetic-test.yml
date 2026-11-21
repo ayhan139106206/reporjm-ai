@@ -11,10 +11,10 @@ on:
           - synthetic_test
         default: synthetic_test
       steps:
-        description: Small from-scratch optimizer-step budget for a smoke test
+        description: Synthetic-only from-scratch steps; does not qualify production training
         required: true
         type: number
-        default: 12
+        default: 300
 
 permissions:
   contents: read

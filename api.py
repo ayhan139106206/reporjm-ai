@@ -19,10 +19,19 @@ MODEL_DIR = Path(os.environ.get("MONSTER1_MODEL_DIR", "artifacts/model"))
 DEMO_MODEL_DIR = Path(os.environ.get("MONSTER1_SYNTHETIC_DEMO_DIR", "artifacts/synthetic_test"))
 CONFIG_PATH = Path(os.environ.get("MONSTER1_CONFIG", "config.json"))
 MAX_GENERATION_TOKENS = 128
+MIN_SYNTHETIC_GENERATION_TOKENS = 1
 DEMO_WARNING = (
     "Experimental synthetic-data demo only. Responses may be poor or meaningless; "
     "this is not a trained Persian assistant and must not be used for production decisions."
 )
+SYNTHETIC_DIGIT_TRANSLATION = str.maketrans(
+    "۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789"
+)
+
+
+def normalize_synthetic_prompt(prompt: str) -> str:
+    """Map Persian and Arabic decimal digits to the synthetic corpus's ASCII forms."""
+    return prompt.translate(SYNTHETIC_DIGIT_TRANSLATION)
 
 
 def sha256_file(path: Path) -> str:
@@ -200,7 +209,6 @@ class SyntheticDemoRuntime:
         self.max_sequence_length = int(self.config.get("max_sequence_length", 1024))
         self.eos_id = self.tokenizer.eos_id()
         self.forbidden_ids = {
-            self.eos_id,
             self.tokenizer.unk_id(),
             self.tokenizer.bos_id(),
             self.tokenizer.pad_id(),
@@ -211,25 +219,35 @@ class SyntheticDemoRuntime:
             if token_id <= self.tokenizer.unk_id():
                 raise RuntimeError(f"Could not resolve reserved synthetic token {index}")
             self.forbidden_ids.add(token_id)
+        self.unrenderable_ids = {
+            token_id
+            for token_id in range(self.tokenizer.vocab_size())
+            if not self.tokenizer.decode([token_id]).strip()
+        }
+        self.unrenderable_ids.discard(self.eos_id)
         self.available = True
 
     def generate(self, prompt: str, max_new_tokens: int) -> str:
-        token_ids = self.tokenizer.encode(prompt, out_type=int)
+        token_ids = self.tokenizer.encode(normalize_synthetic_prompt(prompt), out_type=int)
         if not token_ids or self.tokenizer.unk_id() in token_ids:
             raise ValueError("The input could not be represented without UNK tokens")
         if len(token_ids) >= self.max_sequence_length:
             token_ids = token_ids[-(self.max_sequence_length - 1) :]
         prompt_length = len(token_ids)
-        for _ in range(max_new_tokens):
+        for step in range(max_new_tokens):
             context = token_ids[-self.max_sequence_length :]
             input_ids = np.asarray([context], dtype=np.int64)
             logits = self.session.run(
                 [self.output_name], {self.input_name: input_ids}
             )[0]
             next_logits = logits[0, -1].copy()
-            for token_id in self.forbidden_ids:
+            for token_id in self.forbidden_ids | self.unrenderable_ids:
                 if 0 <= token_id < len(next_logits):
                     next_logits[token_id] = -np.inf
+            if step < MIN_SYNTHETIC_GENERATION_TOKENS:
+                next_logits[self.eos_id] = -np.inf
+            if not np.isfinite(next_logits).any():
+                raise RuntimeError("No renderable synthetic token remains for generation")
             next_id = int(np.argmax(next_logits))
             token_ids.append(next_id)
             if next_id == self.eos_id:

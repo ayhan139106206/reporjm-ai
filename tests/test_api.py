@@ -1,8 +1,57 @@
 import unittest
 
+import numpy as np
 from fastapi.testclient import TestClient
 
 import api
+
+
+class SyntheticDecoderTests(unittest.TestCase):
+    def test_normalizes_persian_and_arabic_decimal_digits(self):
+        self.assertEqual(
+            api.normalize_synthetic_prompt("جمع ۱۲۳ و ٤٥٦"),
+            "جمع 123 و 456",
+        )
+
+    def test_skips_blank_piece_and_stops_at_eos(self):
+        class FakeTokenizer:
+            def encode(self, prompt, out_type=int):
+                return [7]
+
+            def unk_id(self):
+                return 0
+
+            def decode(self, token_ids):
+                return "".join({5: "پاسخ"}.get(token_id, "") for token_id in token_ids)
+
+        class FakeSession:
+            def __init__(self):
+                self.calls = 0
+
+            def run(self, output_names, inputs):
+                sequence = inputs["input_ids"].shape[1]
+                logits = np.zeros((1, sequence, 8), dtype=np.float32)
+                if self.calls == 0:
+                    logits[0, -1, 2] = 200.0  # immediate EOS must not produce an empty reply
+                    logits[0, -1, 4] = 100.0  # whitespace-only piece
+                    logits[0, -1, 5] = 10.0   # visible model token
+                else:
+                    logits[0, -1, 2] = 100.0  # EOS should remain available
+                self.calls += 1
+                return [logits]
+
+        runtime = api.SyntheticDemoRuntime.__new__(api.SyntheticDemoRuntime)
+        runtime.tokenizer = FakeTokenizer()
+        runtime.forbidden_ids = {0, 1, 3}
+        runtime.unrenderable_ids = {0, 1, 3, 4}
+        runtime.eos_id = 2
+        runtime.session = FakeSession()
+        runtime.input_name = "input_ids"
+        runtime.output_name = "logits"
+        runtime.max_sequence_length = 16
+
+        self.assertEqual(runtime.generate("سلام", max_new_tokens=8), "پاسخ")
+        self.assertEqual(runtime.session.calls, 2)
 
 
 class ApiReadinessTests(unittest.TestCase):

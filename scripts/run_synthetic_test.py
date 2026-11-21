@@ -503,7 +503,7 @@ def main() -> None:
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     parser.add_argument("--report", type=Path, default=DEFAULT_REPORT)
     parser.add_argument("--config", type=Path, default=ROOT / "config.json")
-    parser.add_argument("--steps", type=int, default=12)
+    parser.add_argument("--steps", type=int, default=300)
     parser.add_argument("--batch-size", type=int, default=2)
     parser.add_argument("--eval-batches", type=int, default=3)
     parser.add_argument("--seed", type=int, default=20261121)
