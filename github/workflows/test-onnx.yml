@@ -1,0 +1,56 @@
+
+name: Test Monster-1 ONNX
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install ONNX Runtime
+        run: pip install onnx onnxruntime numpy
+
+      - name: Validate and run model
+        run: |
+          python - <<'PY'
+          import onnx
+          import onnxruntime as ort
+          import numpy as np
+
+          path = "monster1.onnx"
+
+          model = onnx.load(path)
+          onnx.checker.check_model(model)
+
+          session = ort.InferenceSession(
+              path,
+              providers=["CPUExecutionProvider"]
+          )
+
+          print("INPUTS:")
+          for item in session.get_inputs():
+              print(item.name, item.shape, item.type)
+
+          print("OUTPUTS:")
+          for item in session.get_outputs():
+              print(item.name, item.shape)
+
+          x = np.zeros((1, 16), dtype=np.int64)
+          result = session.run(None, {"input_ids": x})
+
+          assert result
+          assert np.isfinite(result[0]).all()
+
+          print("MONSTER-1 ONNX INFERENCE SUCCESS!")
+          print("Output shape:", result[0].shape)
+          PY
