@@ -68,6 +68,16 @@ def _manifest_issues(manifest_path: Path, files: dict[str, Path]) -> list[str]:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     except Exception as exc:
         return [f"Invalid corpus manifest JSON: {exc}"]
+    if (
+        manifest.get("is_synthetic") is True
+        or manifest.get("synthetic") is True
+        or manifest.get("real_data") is False
+        or manifest.get("mode") in ("synthetic_test", "synthetic_padding")
+    ):
+        return [
+            "Synthetic data is never eligible for production training; provide a genuinely sourced "
+            "corpus with rights and provenance instead."
+        ]
     issues = [
         f"corpus_manifest.json is missing or has an empty '{key}'"
         for key in REQUIRED_MANIFEST_FIELDS
@@ -142,6 +152,7 @@ def preflight(
         "notes": [
             "The repository's legacy checkpoint is not accepted as a trained model.",
             "Training uses only supplied corpus text; there is no synthetic-data fallback.",
+            "Manifests marked synthetic or not-real are rejected before tokenizer fitting or training.",
         ],
     }
     if missing_files:
@@ -340,6 +351,8 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
                 manifest = {
                     "name": "Monster-1",
                     "status": "trained",
+                    "is_synthetic": False,
+                    "real_data": True,
                     "pretrained_model": False,
                     "parameter_count": count_parameters(model),
                     "vocab_size": processor.vocab_size(),

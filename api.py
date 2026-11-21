@@ -44,6 +44,8 @@ class ModelRuntime:
         manifest = json.loads(self.manifest_path.read_text(encoding="utf-8"))
         if manifest.get("status") != "trained" or manifest.get("pretrained_model") is not False:
             raise RuntimeError("Model manifest does not attest a completed from-scratch training run")
+        if manifest.get("is_synthetic") is not False or manifest.get("real_data") is not True:
+            raise RuntimeError("Model manifest does not attest training on real, non-synthetic data")
         if int(manifest.get("parameter_count", -1)) != self.parameter_count:
             raise RuntimeError("Model manifest parameter count does not match config")
         if int(manifest.get("vocab_size", -1)) != int(self.config["vocab_size"]):
@@ -153,6 +155,8 @@ def health() -> dict[str, object]:
         "service": "monster-1-api",
         "model_ready": runtime is not None,
         "status": "ready" if runtime is not None else "not_ready",
+        "inference_backend": "local_onnxruntime_cpu" if runtime is not None else "not_configured",
+        "external_model_api_used": False,
     }
 
 
@@ -170,6 +174,9 @@ def model_info() -> dict[str, object]:
         "pretrained_model": False,
         "engine_ready": runtime is not None,
         "training_status": "trained" if runtime is not None else "not_trained_or_unverified",
+        "inference_backend": "local_onnxruntime_cpu" if runtime is not None else "not_configured",
+        "external_model_api_used": False,
+        "max_generation_tokens_per_request": MAX_GENERATION_TOKENS,
     }
 
 

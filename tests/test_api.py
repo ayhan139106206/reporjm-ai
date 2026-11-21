@@ -17,8 +17,13 @@ class ApiReadinessTests(unittest.TestCase):
         model = self.client.get("/v1/model")
         self.assertEqual(health.status_code, 200)
         self.assertFalse(health.json()["model_ready"])
+        self.assertFalse(health.json()["external_model_api_used"])
+        self.assertEqual(health.json()["inference_backend"], "not_configured")
         self.assertEqual(model.status_code, 200)
         self.assertFalse(model.json()["engine_ready"])
+        self.assertFalse(model.json()["external_model_api_used"])
+        self.assertEqual(model.json()["inference_backend"], "not_configured")
+        self.assertEqual(model.json()["max_generation_tokens_per_request"], 128)
         self.assertEqual(model.json()["training_status"], "not_trained_or_unverified")
         self.assertEqual(model.json()["parameters"], 5_522_944)
 

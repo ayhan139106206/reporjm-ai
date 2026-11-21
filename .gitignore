@@ -14,6 +14,7 @@ node_modules/
 /data/*.txt
 /data/corpus_manifest.json
 /data/synthetic_test/
+/data/synthetic_scale/
 /reports/synthetic_test/
 /artifacts/
 *.pt

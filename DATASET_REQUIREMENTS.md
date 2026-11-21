@@ -30,7 +30,7 @@ Example manifest shape (replace every example value with the actual provenance):
 }
 ```
 
-The corpus for the real-training path must be real, sourced text—not generated examples, random token IDs, or a handful of hand-written prompts. It must not contain private personal data or material whose license/terms prohibit training. Remove duplicates and keep the source/attribution information with the resulting model artifact. Synthetic examples are explicitly confined to `synthetic_test` and must be identified as synthetic in their manifest and outputs.
+The corpus for the real-training path must be real, sourced text—not generated examples, random token IDs, or a handful of hand-written prompts. It must not contain private personal data or material whose license/terms prohibit training. Remove duplicates and keep the source/attribution information with the resulting model artifact. Synthetic examples are explicitly confined to `synthetic_test` and must be identified as synthetic in their manifest and outputs. The optional `scripts/generate_synthetic_scale.py` can repeat those examples until a large token-count target is reached for storage/pipeline stress testing, but the result is repetitive padding, not new knowledge or a real corpus. Its `synthetic_padding` manifest is rejected by preflight even if someone adds fake source/license fields; it cannot qualify training or make the API ready.
 
 ## Minimum data gate
 
