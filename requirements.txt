@@ -1,4 +1,4 @@
-# Python 3.11 is used in GitHub Actions.
+# Python 3.12 is used in GitHub Actions and supports the pinned NumPy version.
 torch==2.15.0
 numpy==2.5.3
 sentencepiece==0.2.3
