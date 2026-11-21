@@ -1,0 +1,38 @@
+{
+  "project": "Monster-1",
+  "status": "blocked_missing_data",
+  "training_ready": false,
+  "training_performed": false,
+  "parameter_count": 5522944,
+  "vocab_size": 4096,
+  "target_train_tokens": 110458880,
+  "minimum_validation_tokens": 1000000,
+  "minimum_test_tokens": 1000000,
+  "tokens_per_training_step": 512,
+  "steps_needed_for_token_target": 215740,
+  "max_steps_requested": 220000,
+  "required_files": [
+    "data/train.txt",
+    "data/validation.txt",
+    "data/test.txt",
+    "data/corpus_manifest.json"
+  ],
+  "missing_files": [
+    "data/train.txt",
+    "data/validation.txt",
+    "data/test.txt",
+    "data/corpus_manifest.json"
+  ],
+  "data_token_counts": {},
+  "corpus_manifest_issues": [],
+  "notes": [
+    "The repository's legacy checkpoint is not accepted as a trained model.",
+    "Training uses only supplied corpus text; there is no synthetic-data fallback."
+  ],
+  "required_data": {
+    "train": "110,458,880 SentencePiece tokens of licensed, sourced Persian text",
+    "validation": "at least 1,000,000 held-out SentencePiece tokens",
+    "test": "at least 1,000,000 separate held-out SentencePiece tokens",
+    "manifest": "source/license names and HTTPS URLs, fa language, collection date, attribution, rights_to_train=true, privacy_reviewed=true, and SHA-256 for each split"
+  }
+}

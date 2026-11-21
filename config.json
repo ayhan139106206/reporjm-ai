@@ -1,11 +1,15 @@
 {
   "name": "Monster-1",
-  "version": "1.0.0",
-  "architecture": "custom-transformer",
-  "language": "multilingual",
+  "version": "1.1.0",
+  "architecture": "causal-transformer",
+  "language": "fa",
   "vocab_size": 4096,
   "hidden_size": 256,
   "layers": 4,
   "heads": 4,
-  "pretrained_model": false
+  "max_sequence_length": 1024,
+  "training_sequence_length": 128,
+  "dropout": 0.1,
+  "pretrained_model": false,
+  "training_status": "not_trained"
 }

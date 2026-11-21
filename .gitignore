@@ -1,0 +1,20 @@
+# Python and local environments
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Worker and local secrets
+node_modules/
+.wrangler/
+.dev.vars
+.env
+
+# Training corpus and model artifacts must stay outside Git
+/data/*.txt
+/data/corpus_manifest.json
+/artifacts/
+*.pt
+*.onnx
+*.model
+*.vocab

@@ -1,0 +1,8 @@
+# Python 3.11 is used in GitHub Actions.
+torch==2.15.0
+numpy==2.5.3
+sentencepiece==0.2.3
+onnx==1.23.2
+onnxruntime==1.32.0
+fastapi==0.115.12
+uvicorn==0.34.0
