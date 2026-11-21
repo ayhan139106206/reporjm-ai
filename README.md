@@ -33,6 +33,20 @@ python -m pip install -r requirements.txt
 uvicorn api:app --host 127.0.0.1 --port 8000
 ```
 
+### Experimental synthetic demo API
+
+To expose the existing synthetic smoke-test model through a separate local-only demo route, first generate its test artifacts with `python scripts/run_synthetic_test.py --mode synthetic_test`, then start the API as above. The demo is available at `GET /v1/demo/health`, `GET /v1/demo/model`, and `POST /v1/demo/chat`. Example request:
+
+```bash
+curl -X POST http://127.0.0.1:8000/v1/demo/chat \
+  -H 'Content-Type: application/json' \
+  -d '{"messages":[{"role":"user","content":"سلام"}],"max_new_tokens":16}'
+```
+
+This route uses local ONNX Runtime on CPU and makes no external model/API calls. It is explicitly labeled `experimental`, `is_synthetic`, and `not_for_production`; its `engine_ready` field is always `false`. The generated responses may be poor or meaningless, and this endpoint does not change the readiness or behavior of the production `GET /v1/health`, `GET /v1/model`, or `POST /v1/chat` routes. It is not publicly deployed, and the Cloudflare Worker is unchanged.
+
+If the tiny smoke-test model emits no displayable text, the API reports `generation_status: "empty_model_output"`, returns a plain diagnostic message, and sets `reply_is_model_output: false` rather than pretending the diagnostic came from the model.
+
 The Cloudflare Worker in `src/index.js` remains a gateway only. It does not run PyTorch/ONNX. Set its `MODEL_API_URL` to a separately hosted Monster-1 FastAPI service before expecting inference; without that setting, chat correctly returns 503. No paid hosting or external inference API is configured.
 
 ## Local validation
