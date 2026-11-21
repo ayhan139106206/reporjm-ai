@@ -1,0 +1,11 @@
+{
+  "name": "Monster-1",
+  "version": "1.0.0",
+  "architecture": "custom-transformer",
+  "language": "multilingual",
+  "vocab_size": 4096,
+  "hidden_size": 256,
+  "layers": 4,
+  "heads": 4,
+  "pretrained_model": false
+}
