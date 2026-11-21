@@ -182,6 +182,79 @@ def export_and_verify(
     return report
 
 
+def export_synthetic_test(
+    weights_path: Path,
+    tokenizer_path: Path,
+    manifest_path: Path,
+    output_path: Path,
+    config_path: Path = Path("config.json"),
+) -> dict[str, Any]:
+    """Export only an explicitly marked synthetic smoke-test checkpoint.
+
+    This is deliberately separate from ``export_and_verify``: synthetic
+    artifacts remain test-only and can never pass the production training gate.
+    """
+    required = (weights_path, tokenizer_path, manifest_path)
+    if any(not path.is_file() for path in required):
+        raise FileNotFoundError("Synthetic ONNX export requires weights, tokenizer, and model_manifest.json")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if (
+        manifest.get("status") != "synthetic_test_only"
+        or manifest.get("training_mode") != "synthetic_test"
+        or manifest.get("is_synthetic") is not True
+        or manifest.get("not_for_production") is not True
+        or manifest.get("pretrained_model") is not False
+    ):
+        raise ValueError("Refusing synthetic export: model manifest is not explicitly test-only and from-scratch")
+    if sha256_file(weights_path) != manifest.get("weights_sha256"):
+        raise ValueError("Synthetic weights checksum does not match model_manifest.json")
+    if sha256_file(tokenizer_path) != manifest.get("tokenizer_sha256"):
+        raise ValueError("Synthetic tokenizer checksum does not match model_manifest.json")
+
+    from sentencepiece import SentencePieceProcessor
+
+    config = load_config(config_path)
+    processor = SentencePieceProcessor(model_file=str(tokenizer_path))
+    model = Monster1.from_config(config)
+    if processor.vocab_size() != int(config["vocab_size"]) or model.vocab_size != processor.vocab_size():
+        raise ValueError(
+            f"Synthetic tokenizer/model/config vocab mismatch: {processor.vocab_size()} / "
+            f"{model.vocab_size} / {config['vocab_size']}"
+        )
+    state = torch.load(weights_path, map_location="cpu", weights_only=True)
+    model.load_state_dict(state, strict=True)
+    model.eval()
+    export_graph(model, output_path, example_length=min(16, int(config.get("max_sequence_length", 1024))))
+    report = verify_runtime(
+        model,
+        output_path,
+        vocab_size=processor.vocab_size(),
+        test_lengths=(1, 2, 16, 32, 64),
+        generation_steps=4,
+    )
+    report.update(
+        {
+            "status": "passed_synthetic_test_only",
+            "mode": "synthetic_test",
+            "is_synthetic": True,
+            "not_for_production": True,
+            "pretrained_model": False,
+            "onnx_sha256": sha256_file(output_path),
+            "tokenizer_vocab_size": processor.vocab_size(),
+            "model_vocab_size": model.vocab_size,
+            "quality_verified": False,
+            "engine_ready": False,
+            "interpretation": "ONNX graph, runtime parity, and token-loop mechanics passed; this is not evidence of training adequacy or language quality.",
+        }
+    )
+    report_path = output_path.parent / "onnx_test_report.json"
+    report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    manifest["onnx_sha256"] = report["onnx_sha256"]
+    manifest["onnx_test_report_sha256"] = sha256_file(report_path)
+    manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return report
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Export and verify a genuinely trained Monster-1 model")
     parser.add_argument("--weights", type=Path, default=Path("artifacts/model/monster1.pt"))

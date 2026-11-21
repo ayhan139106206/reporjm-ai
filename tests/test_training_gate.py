@@ -3,10 +3,18 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from train import preflight
+from model import Monster1, count_parameters, load_config
+from train import MIN_TOKENS_PER_PARAMETER, preflight
 
 
 class TrainingGateTests(unittest.TestCase):
+    def test_real_data_token_threshold_remains_unchanged(self):
+        config = load_config("config.json")
+        parameters = count_parameters(Monster1.from_config(config))
+        self.assertEqual(parameters, 5_522_944)
+        self.assertEqual(MIN_TOKENS_PER_PARAMETER, 20)
+        self.assertEqual(parameters * MIN_TOKENS_PER_PARAMETER, 110_458_880)
+
     def test_missing_corpus_stops_before_tokenizer_or_weights(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

@@ -14,6 +14,12 @@ Read [DATASET_REQUIREMENTS.md](DATASET_REQUIREMENTS.md) before supplying data. T
 
 The manually triggered `.github/workflows/monster1.yml` workflow accepts a direct HTTPS archive URL and SHA-256, downloads only that static file, checks the hash, extracts only the expected corpus files, and runs preflight. It performs no external model/API inference. Training is off by default, limited to 300 minutes, and produces a final checkpoint only after the token budget and held-out loss gates pass. Output files go to a short-retention GitHub Actions Artifact, not Git.
 
+## Isolated synthetic smoke test
+
+Run `.github/workflows/monster1-synthetic-test.yml` manually and leave its mode set to `synthetic_test` to exercise the end-to-end pipeline without a real corpus. `scripts/generate_synthetic_data.py` makes a deterministic, locally generated Persian dataset for conversation, question/answer, simple math, logic, beginner Python, and simulated Persian commands. The separate runner trains a fresh instance of the existing architecture from random initialization, fits a SentencePiece tokenizer, checks the exact model/tokenizer vocabulary match, exports ONNX, and runs several Persian prompts. It makes no model/API calls and never loads the legacy checkpoint.
+
+All test outputs are isolated under `artifacts/synthetic_test/`, including `monster1.pt`, `monster1.onnx`, `tokenizer.model`, `tokenizer.vocab`, `training_report.json`, and `corpus_manifest.json`. The manifest/report explicitly label the data and model as synthetic and not for production. Because this small corpus naturally yields only about 360 unigram pieces, the tokenizer records the remaining IDs as unused, explicitly named test-reserve entries to keep the model head at the existing 4,096-wide configuration; these are not claimed as learned vocabulary and are masked during sample generation. This mode does not change or bypass the real-data token gate, does not write to `artifacts/model/`, and cannot make `engine_ready` true. ONNX parity and sample generation are mechanics checks only; they are not a language-quality result. GitHub Actions uploads the outputs and detailed failure report as a 30-day Artifact, including when a pipeline step fails.
+
 ## API and deployment layout
 
 `api.py` is the independent FastAPI CPU inference service. It loads `monster1.pt`, `monster1.onnx`, `monster1_tokenizer.model`, and `model_manifest.json` from `artifacts/model/` only when checksums, vocabulary, dynamic ONNX input, provenance, and completed-training metrics are valid. Run it with:

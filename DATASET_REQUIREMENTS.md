@@ -1,6 +1,6 @@
 # Monster-1 training data requirements
 
-The current repository contains no approved real Persian training corpus. Training is therefore blocked. The five-line sample used by an earlier workflow and the random token IDs it trained on are not acceptable data and must never be used as a substitute.
+The current repository contains no approved real Persian training corpus. Real-data training is therefore blocked. The five-line sample used by an earlier workflow and the random token IDs it trained on are not acceptable data and must never be used as a substitute. The separate `synthetic_test` workflow uses generated examples only to test pipeline mechanics; it is not a real-data substitute and can never pass the real-data gate.
 
 ## Required corpus package
 
@@ -30,17 +30,17 @@ Example manifest shape (replace every example value with the actual provenance):
 }
 ```
 
-The corpus must be real, sourced text—not generated examples, random token IDs, or a handful of hand-written prompts. It must not contain private personal data or material whose license/terms prohibit training. Remove duplicates and keep the source/attribution information with the resulting model artifact.
+The corpus for the real-training path must be real, sourced text—not generated examples, random token IDs, or a handful of hand-written prompts. It must not contain private personal data or material whose license/terms prohibit training. Remove duplicates and keep the source/attribution information with the resulting model artifact. Synthetic examples are explicitly confined to `synthetic_test` and must be identified as synthetic in their manifest and outputs.
 
 ## Minimum data gate
 
 The current architecture has 5,522,944 parameters. This project uses a conservative planning target of 20 training tokens per parameter: **at least 110,458,880 SentencePiece tokens** in `train.txt`, plus at least **1,000,000 tokens each** in validation and test. This is an engineering gate, not a promise of assistant quality. The corpus must also be predominantly Persian and large/diverse enough to train a 4,096-piece SentencePiece vocabulary.
 
-The pipeline counts tokens with the exact trained tokenizer. It will not create `monster1.pt` or `monster1.onnx` if the corpus or compute budget is below the gate. It will write a preflight report explaining the missing files, license/provenance fields, or token counts instead.
+The real-data pipeline counts tokens with the exact trained tokenizer. It will not create production `monster1.pt` or `monster1.onnx` if the corpus or compute budget is below the gate. It will write a preflight report explaining the missing files, license/provenance fields, or token counts instead. The isolated synthetic runner writes only under `artifacts/synthetic_test/`; its small test dataset does not alter this threshold.
 
 ## Supplying data to the free workflow
 
-Do not commit a large corpus to Git. For a manual GitHub Actions run, provide a direct HTTPS URL to the archive and its SHA-256 checksum. The workflow downloads a static file only, checks the checksum, extracts only the four expected files, and performs no model/API calls. If no URL/checksum is supplied, it stops at preflight and uploads the status report only.
+Do not commit a large corpus to Git. For a manual real-data GitHub Actions run, provide a direct HTTPS URL to the archive and its SHA-256 checksum. The workflow downloads a static file only, checks the checksum, extracts only the four expected files, and performs no model/API calls. If no URL/checksum is supplied, it stops at preflight and uploads the status report only. The separate `.github/workflows/monster1-synthetic-test.yml` workflow runs only `synthetic_test`, makes no external model/API calls, and uploads a clearly labeled test-only artifact and report.
 
 ## Compute constraint
 
