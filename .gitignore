@@ -13,6 +13,9 @@ node_modules/
 # Training corpus and model artifacts must stay outside Git
 /data/*.txt
 /data/corpus_manifest.json
+/data/wikipedia_source/
+/data/article_attribution.tsv
+/data/privacy_scan.json
 /data/synthetic_test/
 /data/synthetic_scale/
 /reports/synthetic_test/

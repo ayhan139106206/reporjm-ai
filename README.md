@@ -1,6 +1,6 @@
 # Monster-1 Persian language model
 
-**Current status: not trained on real Persian data.** The repository currently has no approved Persian corpus, no valid 4,096-piece tokenizer, and no verified training manifest. The API therefore reports `model_ready: false` and `/v1/chat` returns HTTP 503 until a genuine from-scratch run passes the data, validation, and provenance gates.
+**Current status: real-data preparation is pinned and reproducible; no completed, quality-validated model is available.** The API therefore reports `model_ready: false` and `/v1/chat` returns HTTP 503 until a genuine from-scratch run passes the data, validation, and provenance gates.
 
 ## Architecture
 
@@ -12,7 +12,15 @@ The legacy `monster1.pt` and `monster1.onnx` files in the current GitHub history
 
 Read [DATASET_REQUIREMENTS.md](DATASET_REQUIREMENTS.md) before supplying data. The minimum planning gate is 110,458,880 actual SentencePiece tokens for training, plus 1,000,000 separate tokens each for validation and test, with source, license, attribution, rights, and checksums documented. This is a planning threshold—not a quality guarantee.
 
-The manually triggered `.github/workflows/monster1.yml` workflow accepts a direct HTTPS archive URL and SHA-256, downloads only that static file, checks the hash, extracts only the expected corpus files, and runs preflight. It performs no external model/API inference. Training is off by default, limited to 300 minutes, and produces a final checkpoint only after the token budget and held-out loss gates pass. Output files go to a short-retention GitHub Actions Artifact, not Git.
+The `.github/workflows/monster1.yml` workflow is manual-only and opts out by default. When explicitly enabled, it fetches the pinned corpus below, verifies all shard checksums, prepares real-data splits with a privacy scan, and runs the repository tests and preflight before training from random initialization. Synthetic data and `.github/workflows/monster1-synthetic-test.yml` are never inputs to this workflow. The job is capped at 350 minutes overall and the training loop at 300 minutes; incomplete runs do not produce a final checkpoint. No model/API provider is called.
+
+This repository is public. Standard GitHub-hosted Linux runners are free for public repositories; for a private repository, the workflow runs only if its manual input confirms that at least 350 Linux 2-core minutes ($2.10 at the listed rate) remain in the month's shared included compute. That balance is not queried automatically. The workflow also requires confirmation that at least 100 MB of the GitHub Free 500 MB artifact-storage allowance remains, and caps model artifacts at 100 MiB; reports and model artifacts are retained for 7 days. Model files are never committed: they are uploaded only for a private repository, or if a separate rights/privacy review has explicitly authorized public release. In a public repository, an artifact can be downloaded by anyone with repository read access, so the public-release confirmation defaults to false.
+
+## Current verified corpus and compute status
+
+The source is `AIgenius1/persian-pretraining-dataset`, pinned to revision `a6906d5585c981b74442f4be186ab9098e26b363`. The publisher identifies it as Persian Wikipedia and declares CC BY-SA 4.0; all 46 shard sizes and SHA-256 values were checked, and article URLs are retained for attribution. Rights for publicly releasing downstream model weights still need separate review. The prepared splits contain 798,903 training, 44,210 validation, and 44,202 test articles. Exact SentencePiece counts are 295,868,792 training tokens, 16,627,727 validation tokens, and 16,202,149 test tokens. Corpus files and model artifacts are not stored in Git.
+
+A CPU-only benchmark on actual training-text token windows found batch 32 fastest at about 5,030 tokens/second: the 110,458,880-token minimum alone is estimated at 6.10 hours, before corpus preparation, validation, and final test evaluation. Batch 64 was slower at 6.58 hours. This exceeds the workflow's 300-minute training cap, so a CI run may end incomplete; an incomplete run is not production-ready and the API stays disabled. A completed run and held-out loss gate are not by themselves a claim of general language quality.
 
 ## Isolated synthetic smoke test
 
